@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>זיכרון — Jeu de mémoire hébreu</title>
+<style>
+  :root {
+    --bg1: #1a1a2e;
+    --bg2: #16213e;
+    --accent: #e94560;
+    --gold: #f5c518;
+    --card-back: linear-gradient(135deg, #0f3460, #16213e);
+    --card-face: #fdf6e3;
+    --text-light: #eaeaea;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: radial-gradient(ellipse at top, var(--bg2), var(--bg1));
+    min-height: 100vh;
+    color: var(--text-light);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+  }
+  h1 {
+    font-size: 2rem;
+    margin-bottom: 4px;
+    background: linear-gradient(90deg, var(--gold), var(--accent));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .subtitle { opacity: 0.7; margin-bottom: 18px; font-size: 0.95rem; }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+  .theme-btn {
+    padding: 8px 18px;
+    border: 2px solid transparent;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.08);
+    color: var(--text-light);
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: all 0.2s;
+  }
+  .theme-btn:hover { background: rgba(255,255,255,0.18); }
+  .theme-btn.active {
+    border-color: var(--gold);
+    background: rgba(245,197,24,0.15);
+    color: var(--gold);
+  }
+
+  .stats {
+    display: flex;
+    gap: 24px;
+    margin-bottom: 18px;
+    font-size: 1rem;
+    background: rgba(255,255,255,0.06);
+    padding: 10px 24px;
+    border-radius: 12px;
+  }
+  .stats span b { color: var(--gold); }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(70px, 110px));
+    gap: 12px;
+    perspective: 900px;
+  }
+  @media (max-width: 520px) {
+    .board { grid-template-columns: repeat(4, minmax(64px, 1fr)); gap: 8px; width: 100%; }
+  }
+
+  .card {
+    aspect-ratio: 3 / 4;
+    position: relative;
+    cursor: pointer;
+    transform-style: preserve-3d;
+    transition: transform 0.5s;
+  }
+  .card.flipped { transform: rotateY(180deg); }
+  .card.matched { cursor: default; }
+  .card.matched .face-front {
+    box-shadow: 0 0 14px rgba(245,197,24,0.7);
+    border-color: var(--gold);
+  }
+  .card-inner { width: 100%; height: 100%; }
+
+  .face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    backface-visibility: hidden;
+    padding: 6px;
+    text-align: center;
+  }
+  .face-back {
+    background: var(--card-back);
+    border: 2px solid rgba(255,255,255,0.15);
+    font-size: 1.6rem;
+    color: rgba(255,255,255,0.5);
+  }
+  .face-front {
+    background: var(--card-face);
+    color: #1a1a2e;
+    transform: rotateY(180deg);
+    border: 2px solid rgba(0,0,0,0.1);
+    font-weight: 600;
+  }
+  .face-front .word-he { font-size: 1.35rem; direction: rtl; }
+  .face-front .word-fr { font-size: 0.95rem; }
+  .face-front .translit {
+    font-size: 0.7rem;
+    font-weight: 400;
+    color: #b58900;
+    margin-top: 4px;
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+  .card.matched .translit { opacity: 1; }
+
+  .win-banner {
+    display: none;
+    margin-top: 20px;
+    text-align: center;
+    background: rgba(245,197,24,0.12);
+    border: 1px solid var(--gold);
+    border-radius: 14px;
+    padding: 18px 30px;
+    animation: pop 0.5s ease;
+  }
+  .win-banner.show { display: block; }
+  .win-banner h2 { color: var(--gold); margin-bottom: 6px; }
+  @keyframes pop {
+    0% { transform: scale(0.6); opacity: 0; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .restart {
+    margin-top: 14px;
+    padding: 10px 26px;
+    border: none;
+    border-radius: 24px;
+    background: var(--accent);
+    color: white;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .restart:hover { transform: scale(1.05); box-shadow: 0 4px 16px rgba(233,69,96,0.4); }
+
+  .recap {
+    margin-top: 16px;
+    font-size: 0.9rem;
+    max-width: 480px;
+    width: 100%;
+  }
+  .recap table { width: 100%; border-collapse: collapse; }
+  .recap td { padding: 5px 10px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .recap td.he { direction: rtl; text-align: right; font-size: 1.1rem; color: var(--gold); }
+  .recap td.tr { opacity: 0.6; font-style: italic; }
+</style>
+</head>
+<body>
+
+<h1>🃏 זיכרון — Memory hébreu</h1>
+<p class="subtitle">Associez chaque mot hébreu à sa traduction française</p>
+
+<div class="controls" id="themes"></div>
+
+<div class="stats">
+  <span>Coups : <b id="moves">0</b></span>
+  <span>Temps : <b id="timer">0:00</b></span>
+  <span>Record : <b id="best">—</b></span>
+</div>
+
+<div class="board" id="board"></div>
+
+<div class="win-banner" id="winBanner">
+  <h2>🎉 !כל הכבוד — Kol hakavod !</h2>
+  <p id="winText"></p>
+  <button class="restart" onclick="startGame()">Rejouer 🔄</button>
+</div>
+
+<div class="recap" id="recap"></div>
+
+<script>
+// ---------- Vocabulaire : [hébreu, français, translittération] ----------
+const THEMES = {
+  "Actu & Politique 🗞️": [
+    ["ממשלה", "gouvernement", "memshala"],
+    ["חוק", "loi", "'hok"],
+    ["מליאה", "séance plénière", "melia"],
+    ["קריאה ראשונה", "première lecture (Knesset)", "kria rishona"],
+    ["עתירה לבג\"ץ", "recours à la Cour suprême", "atira labagats"],
+    ["הצהרה", "déclaration", "hats'hara"],
+    ["הדרג המדיני", "l'échelon politique", "hadereg hamedini"],
+    ["חסימת כבישים", "blocage de routes", "'hasimat kvishim"],
+    ["תחזית", "prévision", "ta'hazit"],
+    ["צמיחה", "croissance", "tsmi'ha"],
+    ["הורדת ריבית", "baisse du taux d'intérêt", "horadat ribit"],
+    ["ייסוף", "appréciation (monnaie)", "yisouf"],
+  ],
+  "Travail & Tech 💼": [
+    ["ראיון עבודה", "entretien d'embauche", "reayon avoda"],
+    ["קורות חיים", "CV", "korot 'haïm"],
+    ["משכורת", "salaire", "maskoret"],
+    ["פגישה", "réunion", "pgisha"],
+    ["לקוח", "client", "lakoa'h"],
+    ["בינה מלאכותית", "intelligence artificielle", "bina melakhoutit"],
+    ["פיתוח", "développement", "pitoua'h"],
+    ["חברת הזנק", "start-up", "'hevrat heznek"],
+    ["ניסיון", "expérience", "nisayon"],
+    ["כישורים", "compétences", "kishourim"],
+    ["מנהל", "directeur / manager", "menahel"],
+    ["פרויקט", "projet", "proyekt"],
+  ],
+  "Académique 🎓": [
+    ["מחקר", "recherche", "me'hkar"],
+    ["מסקנה", "conclusion", "maskana"],
+    ["השפעה", "influence", "hashpa'a"],
+    ["תהליך", "processus", "tahalikh"],
+    ["הנחה", "hypothèse / supposition", "hana'ha"],
+    ["טענה", "argument / affirmation", "te'ana"],
+    ["ראיה", "preuve", "re'aya"],
+    ["גישה", "approche", "gisha"],
+    ["מגמה", "tendance", "megama"],
+    ["הגדרה", "définition", "hagdara"],
+    ["השוואה", "comparaison", "hashva'a"],
+    ["יכולת", "capacité", "yekholet"],
+  ],
+};
+
+const PAIRS_PER_GAME = 8;
+let currentTheme = Object.keys(THEMES)[0];
+let flipped = [];
+let matchedCount = 0;
+let moves = 0;
+let timerInterval = null;
+let seconds = 0;
+let lock = false;
+let matchedWords = [];
+
+// ---------- Sons (WebAudio, pas de fichiers) ----------
+function beep(freq, duration = 0.15, type = "sine") {
+  try {
+    const ctx = beep.ctx || (beep.ctx = new (window.AudioContext || window.webkitAudioContext)());
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + duration);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + duration);
+  } catch (e) { /* audio non disponible : on joue en silence */ }
+}
+
+// ---------- Interface thèmes ----------
+const themesDiv = document.getElementById("themes");
+Object.keys(THEMES).forEach(name => {
+  const btn = document.createElement("button");
+  btn.className = "theme-btn" + (name === currentTheme ? " active" : "");
+  btn.textContent = name;
+  btn.onclick = () => {
+    currentTheme = name;
+    document.querySelectorAll(".theme-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    startGame();
+  };
+  themesDiv.appendChild(btn);
+});
+
+// ---------- Logique du jeu ----------
+function startGame() {
+  const board = document.getElementById("board");
+  board.innerHTML = "";
+  document.getElementById("winBanner").classList.remove("show");
+  document.getElementById("recap").innerHTML = "";
+  flipped = [];
+  matchedCount = 0;
+  matchedWords = [];
+  moves = 0;
+  seconds = 0;
+  lock = false;
+  document.getElementById("moves").textContent = "0";
+  document.getElementById("timer").textContent = "0:00";
+  updateBest();
+
+  clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    seconds++;
+    const m = Math.floor(seconds / 60), s = String(seconds % 60).padStart(2, "0");
+    document.getElementById("timer").textContent = `${m}:${s}`;
+  }, 1000);
+
+  // Tirer 8 paires au hasard dans le thème
+  const pool = [...THEMES[currentTheme]].sort(() => Math.random() - 0.5).slice(0, PAIRS_PER_GAME);
+
+  // Créer les cartes : une hébreu + une français par paire
+  const cards = [];
+  pool.forEach((entry, i) => {
+    cards.push({ pairId: i, lang: "he", text: entry[0], translit: entry[2] });
+    cards.push({ pairId: i, lang: "fr", text: entry[1], translit: entry[2] });
+  });
+  cards.sort(() => Math.random() - 0.5);
+
+  cards.forEach(data => {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="face face-back">?</div>
+      <div class="face face-front">
+        <div class="${data.lang === "he" ? "word-he" : "word-fr"}">${data.text}</div>
+        <div class="translit">${data.translit}</div>
+      </div>`;
+    card.dataset.pairId = data.pairId;
+    card.dataset.lang = data.lang;
+    card.onclick = () => flipCard(card);
+    board.appendChild(card);
+  });
+}
+
+function flipCard(card) {
+  if (lock || card.classList.contains("flipped") || card.classList.contains("matched")) return;
+  card.classList.add("flipped");
+  beep(520, 0.08);
+  flipped.push(card);
+
+  if (flipped.length === 2) {
+    moves++;
+    document.getElementById("moves").textContent = moves;
+    const [a, b] = flipped;
+    const isMatch = a.dataset.pairId === b.dataset.pairId && a.dataset.lang !== b.dataset.lang;
+
+    if (isMatch) {
+      a.classList.add("matched");
+      b.classList.add("matched");
+      matchedCount++;
+      const entry = THEMES[currentTheme].find(e => e[0] === (a.dataset.lang === "he" ? a.querySelector(".word-he").textContent : b.querySelector(".word-he").textContent));
+      if (entry) matchedWords.push(entry);
+      flipped = [];
+      setTimeout(() => beep(780, 0.2, "triangle"), 120);
+      if (matchedCount === PAIRS_PER_GAME) endGame();
+    } else {
+      lock = true;
+      setTimeout(() => beep(220, 0.2, "sawtooth"), 150);
+      setTimeout(() => {
+        a.classList.remove("flipped");
+        b.classList.remove("flipped");
+        flipped = [];
+        lock = false;
+      }, 1000);
+    }
+  }
+}
+
+function bestKey() { return "memory-hebreu-best-" + currentTheme; }
+
+function updateBest() {
+  const best = localStorage.getItem(bestKey());
+  document.getElementById("best").textContent = best ? best + " coups" : "—";
+}
+
+function endGame() {
+  clearInterval(timerInterval);
+  [1000, 1250, 1500].forEach((f, i) => setTimeout(() => beep(f, 0.25, "triangle"), i * 150));
+
+  const best = localStorage.getItem(bestKey());
+  let recordMsg = "";
+  if (!best || moves < parseInt(best)) {
+    localStorage.setItem(bestKey(), moves);
+    recordMsg = " 🏆 Nouveau record !";
+    updateBest();
+  }
+  const m = Math.floor(seconds / 60), s = String(seconds % 60).padStart(2, "0");
+  document.getElementById("winText").textContent =
+    `Terminé en ${moves} coups et ${m}:${s}.${recordMsg}`;
+  document.getElementById("winBanner").classList.add("show");
+
+  // Récapitulatif des mots pour réviser
+  const recap = document.getElementById("recap");
+  recap.innerHTML = "<h3 style='margin-bottom:8px'>📖 Mots de cette partie :</h3>";
+  const table = document.createElement("table");
+  matchedWords.forEach(([he, fr, tr]) => {
+    const row = table.insertRow();
+    row.insertCell().outerHTML = `<td class="he">${he}</td>`;
+    row.insertCell().outerHTML = `<td class="tr">${tr}</td>`;
+    row.insertCell().textContent = fr;
+  });
+  recap.appendChild(table);
+}
+
+startGame();
+</script>
+</body>
+</html>
